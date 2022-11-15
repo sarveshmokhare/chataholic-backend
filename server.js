@@ -22,13 +22,16 @@ app.use("/api/user", user);
 app.use("/api/chatRoom", room);
 app.use("/api/message", message);
 
+// app.get("/", (req, res)=>{
+//     res.send("successfully sent request to port 8000");
+// })
+
 //------------------------------ deployment ---------------------------------
 
 // const __dirname1 = path.resolve();
-// // console.log(__dirname);
+
 // if (process.env.NODE_ENV === "production") {
 //     app.use(express.static(path.join(__dirname1, "/frontend/build")));
-//     // console.log(path.join(__dirname1, "frontend", "build", "index.html"));
 //     app.get("*", (req, res) =>
 //         res.sendFile(path.resolve(__dirname1, "frontend", "build", "index.html"))
 //     );
@@ -47,9 +50,6 @@ const server = app.listen(PORT, () => {
 
 const io = require('socket.io')(server, {
     pingTimeout: 60000,
-    cors: {
-        origin: "http://localhost:3000",
-    },
 });
 
 io.on("connection", socket => {
