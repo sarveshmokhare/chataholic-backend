@@ -3,14 +3,14 @@ import axios from 'axios';
 import SendIcon from '@mui/icons-material/Send';
 import { Modal } from '@mui/material';
 
-
 import "./chatBox.css"
+import { BACKEND_URL } from '../globals';
 
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-const backendURL = process.env.REACT_APP_BACKEND_URL;
+const backendURL = BACKEND_URL;
 
 function ChatBox(props) {
   const socket = props.socket;

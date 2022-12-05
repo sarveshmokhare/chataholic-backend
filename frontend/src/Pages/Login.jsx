@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios';
 
 import ChatImg from '../images/chat_app_img.svg';
-
 import "../Pages/HomePage.css";
+import { BACKEND_URL } from '../globals';
 
 // For linearProgress
 const Alert = React.forwardRef(function Alert(props, ref) {
@@ -45,7 +45,7 @@ const HomePage = () => {
 
         // console.log(email, password);
         axios
-            .post(process.env.REACT_APP_BACKEND_URL + "/api/user/auth", { email, password })
+            .post(BACKEND_URL + "/api/user/auth", { email, password })
             .then(res => {
                 // console.log(res.data.email);
                 snackHandler("success", "Signing you in...");

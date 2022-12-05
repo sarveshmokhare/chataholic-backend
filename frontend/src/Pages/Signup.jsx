@@ -5,8 +5,8 @@ import axios from "axios";
 import { UploadClient } from '@uploadcare/upload-client'
 
 import ChatImg from '../images/chat_app_img.svg';
-
 import "../Pages/HomePage.css";
+import { BACKEND_URL } from '../globals';
 
 // For linearProgress
 const Alert = React.forwardRef(function Alert(props, ref) {
@@ -99,7 +99,7 @@ const HomePage = () => {
         formData.append("password", userData.password);
         formData.append("avatar", userData.avatar);
         console.log(formData);
-        axios.post(process.env.REACT_APP_BACKEND_URL + "/api/user/add", formData)
+        axios.post(BACKEND_URL + "/api/user/add", formData)
             .then(res => {
                 console.log(res);
                 snackHandler("success", "Registration successfully!");

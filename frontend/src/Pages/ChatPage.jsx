@@ -8,8 +8,9 @@ import ChatRooms from '../components/ChatRooms';
 import ChatBox from '../components/ChatBox';
 import Header from '../components/Header';
 import "./ChatPage.css";
+import { BACKEND_URL } from '../globals';
 
-const backendURL = process.env.REACT_APP_BACKEND_URL;
+const backendURL = BACKEND_URL;
 const socket = io(backendURL);;
 
 

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { LinearProgress, Modal, Snackbar, Alert as MuiAlert } from '@mui/material';
 
 import "./chatRooms.css"
+import { BACKEND_URL } from '../globals';
 
 const Alert = React.forwardRef(function Alert(props, ref) {
   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
@@ -32,7 +33,7 @@ function ChatRooms(props) {
   };
   // Snacks code ends
 
-  const backendURL = process.env.REACT_APP_BACKEND_URL;
+  const backendURL = BACKEND_URL;
   const [loading, setLoading] = useState(false);
 
   const socket = props.socket;

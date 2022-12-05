@@ -5,6 +5,8 @@ import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+import { BACKEND_URL } from '../globals';
+
 const StyledMenu = styled((props) => (
     <Menu
         elevation={0}
@@ -67,7 +69,7 @@ const style = {
 function Header() {
     const [loading, setLoading] = useState(false);
 
-    const backendURL = process.env.REACT_APP_BACKEND_URL;
+    const backendURL = BACKEND_URL;
     const [userAvatar, setUserAvatar] = useState("");
     const [userName, setUserName] = useState("");
     const userEmail = localStorage.getItem("userEmail").toString();
