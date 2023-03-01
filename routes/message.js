@@ -1,52 +1,54 @@
 const express = require('express');
 
 const Message = require("../models/messageModel");
+const authenticateUserToken = require("../helpers/authenticateToken");
 
 const router = express.Router();
 
-router.post("/send", (req, res) => {
-    const { content, roomId, userId } = req.body;
+router.post("/send", authenticateUserToken, (req, res) => {
+    console.log("/api/message/send");
+    const { content, roomID } = req.body;
+    const userId = req.user.id;
 
-    if(!content || !roomId || !userId){
-        throw new Error("One or more fields required missing.");
-    }
+    if (!content) return res.json({ success: false, message: 'Message content is missing.' })
+    if (!roomID) return res.json({ success: false, message: 'Room ID is missing.' })
 
     const newMessage = new Message({
         sender: userId,
         content: content,
-        room: roomId,
+        room: roomID,
     });
 
-    newMessage.save((err, result)=>{
-        if(err){
-            throw new Error("Error occured while saving the message into database:" + err);
+    newMessage.save((err, result) => {
+        if (err) {
+            console.log("Error occured while saving the message into database:" + err);
+
+            return res.json({ success: false, message: "Error occured while saving the message into database", error: err })
         }
-        else{
-            console.log("Message saved");
-            res.send(result);
-        }
+        res.json({ success: true, message: "Successfully saved the message" })
+
+        console.log("Message saved");
     });
 });
 
 // get all messages in a particular room
 // update in a sorted manner by time
-router.get("/:rID", (req, res) => {
-    const roomID = req.params.rID;
+router.post("/room", authenticateUserToken, async (req, res) => {
+    console.log("/api/message/room");
+    const { roomID } = req.body;
 
-    if (roomID === "undefined") {
-        res.status(400);
-        throw new Error("roomID not received");
-    }
+    if (!roomID) return res.json({ success: false, message: 'Room ID is missing.' })
 
     Message.find({ room: roomID }, (err, foundMsgs) => {
         if (err) {
-            throw new Error("Error occured while finding the message in database" + err);
+            console.log("Error occured while finding the messages in database:" + err);
+
+            return res.json({ success: false, message: "Error occured while finding the messages in the database", error: err })
         }
 
-        else {
-            res.send(foundMsgs);
-            console.log("successfully sent all messages");
-        }
+        res.json({ success: true, data: foundMsgs })
+        console.log("successfully sent all messages");
+
     }).populate("sender");
 });
 

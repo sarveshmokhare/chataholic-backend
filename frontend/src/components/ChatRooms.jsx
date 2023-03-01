@@ -1,49 +1,24 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState, useContext } from 'react'
 import axios from 'axios';
-import { LinearProgress, Modal, Snackbar, Alert as MuiAlert } from '@mui/material';
+import { Modal } from '@mui/material';
 
 import "./chatRooms.css"
-import { BACKEND_URL } from '../globals';
-
-const Alert = React.forwardRef(function Alert(props, ref) {
-  return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
-});
+import { createRoomRoute, addUserToRoomRoute } from '../helpers/routes';
+import SnackContext from '../contexts/SnackContext';
+import BackdropContext from '../contexts/BackdropContext';
 
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+function ChatRooms({ socket, rooms, setRooms, getClickedRoomID }) {
 
-function ChatRooms(props) {
-  // For snacks
-  const [snackOpen, setSnackOpen] = useState(false);
-  const [type, setType] = useState("");
-  const [message, setMessage] = useState("");
-  function snackHandler(t, m) {
-    setType(t);
-    setMessage(m);
-    setSnackOpen(true);
-  }
-  function handleSnackClose(event, reason) {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setSnackOpen(false);
-    setLoading(false);
-  };
-  // Snacks code ends
-
-  const backendURL = BACKEND_URL;
-  const [loading, setLoading] = useState(false);
-
-  const socket = props.socket;
-  const rooms = props.rooms;
-  // console.log(rooms);
-
+  const snackContext = useContext(SnackContext);
+  const backdropContext = useContext(BackdropContext);
 
   function chatRoomHandler(roomID) {
     // console.log(roomID);
-    props.clickedRoomID(roomID);
+    getClickedRoomID(roomID);
     // props.setRoomSelected(true);
     if (window.innerWidth <= 500) {
       document.querySelector(".chatrooms-box").style.display = "none";
@@ -53,43 +28,46 @@ function ChatRooms(props) {
     socket.emit("joinRoom", roomID);
   }
 
-  const [open, setOpen] = React.useState(false);
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+  const [createRoomModalState, setCreateRoomModalState] = React.useState(false);
+  const openCreateRoomModal = () => setCreateRoomModalState(true);
+  const closeCreateRoomModal = () => setCreateRoomModalState(false);
 
-  const [openJoin, setOpenJoin] = React.useState(false);
-  const handleOpenJoin = () => setOpenJoin(true);
-  const handleCloseJoin = () => setOpenJoin(false);
+  const [joinRoomModalState, setJoinRoomModalState] = React.useState(false);
+  const openJoinRoomModal = () => setJoinRoomModalState(true);
+  const closeJoinRoomModal = () => setJoinRoomModalState(false);
 
   const [roomName, setRoomName] = useState("");
-  const userID = props.userID;
+
   function createRoomHandler(e) {
     e.preventDefault();
-    setLoading(true);
+    backdropContext.turnBackdropOn();
 
-    let roomCode = Math.floor(1000 + Math.random() * 9000);
-    try {
-      if (rooms.find(room => room.roomCode === roomCode) !== undefined) {
-        roomCode = Math.floor(1000 + Math.random() * 9000);
-      }
-      // console.log(roomCode);
-    } catch (err) {
-      console.log(err);
-    }
     axios
-      .post(`${backendURL}/api/chatRoom/create`, { userID, roomName, roomCode })
+      .post(createRoomRoute, { roomName },
+        {
+          headers: { 'Authorization': `BEARER ${localStorage.getItem('accessToken')}` },
+        })
       .then(res => {
-        // console.log(res);
-        props.setRooms([...rooms, res.data]);
-        setRoomName("");
-        setLoading(false);
-        setOpen(false);
+        if (res.data.success) {
+          setRooms([...rooms, res.data.data]);
+
+          setRoomName("");
+          setCreateRoomModalState(false);
+          // setLoading(false);
+          backdropContext.turnBackdropOff();
+        }
+        else {
+          snackContext.newSnack(true, "error", res.data.message)
+          backdropContext.turnBackdropOff();
+        }
       })
       .catch(err => {
         console.log(err);
         setRoomName("");
-        setLoading(false);
-        setOpen(false);
+        // setLoading(false);
+        setCreateRoomModalState(false);
+        snackContext.newSnack(true, "error", "Network Error")
+        backdropContext.turnBackdropOff();
       })
 
   }
@@ -97,38 +75,47 @@ function ChatRooms(props) {
   const [roomCode, setRoomCode] = useState("");
   function joinRoomHandler(e) {
     e.preventDefault();
-    setLoading(true);
+    // setLoading(true);
+    backdropContext.turnBackdropOn();
+
     axios
-      .put(`${backendURL}/api/chatRoom/addUser`, { userID, roomCode })
+      .put(addUserToRoomRoute,
+        { roomCode },
+        {
+          headers: { Authorization: `BEARER ${localStorage.getItem('accessToken')}` },
+        })
       .then(res => {
         // console.log(res);
-        props.setRooms([...rooms, res.data]);
-        setRoomCode("");
-        setLoading(false);
-        setOpenJoin(false);
+        if (res.data.success) {
+          setRooms([...rooms, res.data.data]);
+          setRoomCode("");
+          setJoinRoomModalState(false);
+          // setLoading(false);
+          backdropContext.turnBackdropOff();
+        }
+        else {
+          snackContext.newSnack(true, "error", res.data.message)
+          backdropContext.turnBackdropOff();
+        }
       })
       .catch(err => {
         console.log(err);
         setRoomCode("");
-        snackHandler("error", "Room with entered code doesn't exist.");
-        setLoading(false);
-        setOpenJoin(false);
+        setJoinRoomModalState(false);
+        // snackHandler("error", "Room with entered code doesn't exist.");
+        snackContext.newSnack(true, "error", "Network Error")
+        // setLoading(false);
+        backdropContext.turnBackdropOff();
       })
   }
 
   return (
     <div className='chatrooms-box' >
-      {loading && <LinearProgress sx={{ position: "fixed", top: 0, right: 0, left: 0 }} />}
-
-      <Snackbar open={snackOpen} autoHideDuration={5000} onClose={handleSnackClose}>
-        <Alert onClose={handleSnackClose} severity={type} sx={{ width: '100%' }}>
-          {message}
-        </Alert>
-      </Snackbar>
 
       <div>
         <h3>Your Chat Rooms</h3>
-        {rooms.map((room, ind) => {
+        {rooms && rooms.map((room, ind) => {
+
           return (
             <div className='one-chat' key={room._id} onClick={() => chatRoomHandler(room._id)} >
               <h4>{capitalizeFirstLetter(room.roomName)}</h4>
@@ -139,14 +126,14 @@ function ChatRooms(props) {
       </div>
 
       <div className='buttons'>
-        <button onClick={handleOpen} >Create Chat Room</button>
-        <button onClick={handleOpenJoin} >Join a Chat Room</button>
+        <button onClick={openCreateRoomModal} >Create Chat Room</button>
+        <button onClick={openJoinRoomModal} >Join a Chat Room</button>
       </div>
 
       {/* Create Room Modal */}
       <Modal
-        open={open}
-        onClose={handleClose}
+        open={createRoomModalState}
+        onClose={closeCreateRoomModal}
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
@@ -167,8 +154,8 @@ function ChatRooms(props) {
 
       {/* Join room from room code */}
       <Modal
-        open={openJoin}
-        onClose={handleCloseJoin}
+        open={joinRoomModalState}
+        onClose={closeJoinRoomModal}
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
@@ -189,14 +176,5 @@ function ChatRooms(props) {
     </div>
   )
 }
-
-// ChatRooms.propTypes = {
-//   /**
-//    * Injected by the documentation to work in an iframe.
-//    * You won't need it on your project.
-//    */
-//   window: PropTypes.func,
-// };
-
 
 export default ChatRooms

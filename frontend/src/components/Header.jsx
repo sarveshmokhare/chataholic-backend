@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react'
-import { Avatar, Box, Container, IconButton, Menu, MenuItem, Modal, Tooltip, Typography, LinearProgress } from '@mui/material'
+import React, { useEffect, useState, useContext } from 'react'
+import { Avatar, Box, Container, IconButton, Menu, MenuItem, Modal, Tooltip, Typography } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close';
 import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-import { BACKEND_URL } from '../globals';
+import { backendUrl, getUserDataRoute } from '../helpers/routes';
+import SnackContext from '../contexts/SnackContext';
+import BackdropContext from '../contexts/BackdropContext';
 
 const StyledMenu = styled((props) => (
     <Menu
@@ -48,7 +50,6 @@ const StyledMenu = styled((props) => (
     },
 }));
 
-
 const style = {
     position: 'absolute',
     top: '50%',
@@ -64,33 +65,48 @@ const style = {
     }
 };
 
+function Header({ getUserData }) {
+    const snackContext = useContext(SnackContext);
+    const backdropContext = useContext(BackdropContext);
 
-
-function Header() {
-    const [loading, setLoading] = useState(false);
-
-    const backendURL = BACKEND_URL;
+    const backendURL = backendUrl;
     const [userAvatar, setUserAvatar] = useState("");
     const [userName, setUserName] = useState("");
-    const userEmail = localStorage.getItem("userEmail").toString();
+
+    const userEmail = localStorage.getItem("userEmail") && localStorage.getItem("userEmail").toString();
     // console.log(backendURL)
     // console.log(JSON.stringify({ userEmail }));
     useEffect(() => {
         function fetchUserData() {
-            axios.get(`${backendURL}/api/user/getUserData/${userEmail}`)
+            backdropContext.turnBackdropOn();
+
+            axios.get(getUserDataRoute, {
+                headers: { Authorization: `BEARER ${localStorage.getItem('accessToken')}` },
+            })
                 .then(res => {
                     // console.log(res.data);
-                    setLoading(true);
-                    setUserAvatar(res.data.avatar);
-                    setUserName(res.data.name);
-                    setLoading(false);
+                    if (res.data.success) {
+                        setUserAvatar(res.data.data.avatar);
+                        setUserName(res.data.data.name);
+                        getUserData(res.data.data);
+
+                        backdropContext.turnBackdropOff();
+                    }
+                    else {
+                        snackContext.newSnack(true, "error", res.data.message)
+
+                        backdropContext.turnBackdropOff();
+                    }
                     // console.log(userAvatar);
                 })
                 .catch(err => {
                     console.log(err);
+                    snackContext.newSnack(true, "error", "Network Error.")
+                    backdropContext.turnBackdropOff();
                 })
         }
         fetchUserData();
+        /* eslint-disable */
     }, [backendURL, userEmail])
 
     const navigate = useNavigate();
@@ -109,7 +125,7 @@ function Header() {
     // console.log(userName);
     return (
         <div className='first-container'>
-            {loading && <LinearProgress sx={{ position: "fixed", top: 0, right: 0, left: 0 }} />}
+
             <Container
                 sx={{
                     display: "flex",

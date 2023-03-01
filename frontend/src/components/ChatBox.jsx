@@ -1,51 +1,42 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useContext } from 'react'
 import axios from 'axios';
 import SendIcon from '@mui/icons-material/Send';
 import { Modal } from '@mui/material';
 
 import "./chatBox.css"
-import { BACKEND_URL } from '../globals';
+import { sendMessageRoute, removeUserFromRoomRoute, getUsersInRoomRoute } from '../helpers/routes';
+import SnackContext from '../contexts/SnackContext';
+import BackdropContext from '../contexts/BackdropContext';
 
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-const backendURL = BACKEND_URL;
-
-function ChatBox(props) {
-  const socket = props.socket;
-  const roomID = props.roomID;
-  const userID = props.userID;
-  const userData = props.userData;
-  const messages = props.roomMessages;
-  const roomData = props.roomData;
-  const setRoomData = props.setRoomData;
-  // const roomSelected = props.roomSelected;
-  // const setRoomSelected = props.setRoomSelected;
-  // setMessages(props.roomMessages);
-  // const messages = props.roomMessages;
-  // const [senderData, setSenderData] = useState();
-
+function ChatBox({ socket, roomID, userData, messages, setMessages, roomData, setRoomData, rooms, setRooms, userID }) {
+  const snackContext = useContext(SnackContext);
+  const backdropContext = useContext(BackdropContext);
+  // console.log(messages);
   useEffect(() => {
     // console.log("entered here");
-    socket.on("newMsg", (newMsgData) => {
-      axios
-        .get(`${backendURL}/api/user/getUserData/byID/${newMsgData.userId}`)
-        .then(res => {
-          // console.log(senderData);
-          const msg = {
-            content: newMsgData.content,
-            room: newMsgData.roomId,
-            sender: res.data,
-          }
-          // console.log(msg);
-          props.setMessages([...messages, msg]);
-        })
-        .catch(err => {
-          console.log(err);
-        })
-      // console.log("entered socket");
-      // console.log(newMsgData);
+    socket.on("newMsg", async (newMsgData) => {
+      backdropContext.turnBackdropOn();
+
+      console.log(newMsgData);
+      try {
+        const msg = {
+          content: newMsgData.content,
+          room: newMsgData.roomID,
+          sender: newMsgData.userData,
+        }
+
+        await setMessages([...messages, msg]);
+
+        backdropContext.turnBackdropOff();
+      } catch (err) {
+        console.log(err);
+        snackContext.newSnack(true, "error", "Network Error")
+        backdropContext.turnBackdropOff();
+      }
     })
 
     const chatWindow = document.getElementById("parent-chatbox");
@@ -62,62 +53,115 @@ function ChatBox(props) {
   const [message, setMessage] = useState("");
   function submitMsgHandler(e) {
     e.preventDefault();
+    backdropContext.turnBackdropOn();
 
-    const dataToBeSend = {
-      content: message,
-      roomId: roomID,
-      userId: userID,
-    }
+    // const dataToBeSend = {
+    //   content: message,
+    //   roomID
+    // }
+    // console.log(dataToBeSend.roomID);
     // console.log(dataToBeSend);
 
     axios
-      .post(`${backendURL}/api/message/send`, dataToBeSend)
+      .post(sendMessageRoute, {
+        content: message,
+        roomID
+      },
+        {
+          headers: { Authorization: `BEARER ${localStorage.getItem('accessToken')}` }
+        })
       .then(res => {
+        if (res.data.success) {
+          setMessage("");
+
+          // console.log(userData);
+          const msgToBeAppendedInMessagesArray = {
+            content: message,
+            room: roomID,
+            sender: userData,
+          }
+          setMessages([...messages, msgToBeAppendedInMessagesArray]);
+          // console.log([...messages, dataToBeSend]);
+
+          socket.emit("newMessage", {
+            content: message,
+            roomID,
+            userData
+          });
+
+          backdropContext.turnBackdropOff();
+        }
+        else {
+          snackContext.newSnack(true, "error", res.data.message)
+          backdropContext.turnBackdropOff();
+        }
         // console.log(res);
       })
       .catch(err => {
         console.log(err);
+        snackContext.newSnack(true, "error", "Network Error.")
+        backdropContext.turnBackdropOff();
       })
-
-    // console.log(userData);
-    const msgToBeAppendedInMessagesArray = {
-      content: message,
-      room: roomID,
-      sender: userData.data,
-    }
-    props.setMessages([...messages, msgToBeAppendedInMessagesArray]);
-    // console.log([...messages, dataToBeSend]);
-    socket.emit("newMessage", dataToBeSend);
-    setMessage("");
   }
   // console.log(props);
   // console.log(message);
 
   function leaveRoomHandler() {
+    backdropContext.turnBackdropOn();
+
     axios
-      .put(`${backendURL}/api/chatRoom/removeUser`, { userID, roomCode: roomData.roomCode })
-      .then(res => {
-
-        props.setRooms(() => {
-          return props.rooms.filter(room => {
-            return room.roomCode !== roomData.roomCode;
-          })
+      .put(removeUserFromRoomRoute, { roomCode: roomData.roomCode },
+        {
+          headers: { Authorization: `BEARER ${localStorage.getItem('accessToken')}` },
         })
+      .then(res => {
+        if (res.data.success) {
+          setRooms(() => {
+            return rooms.filter(room => {
+              return room.roomCode !== roomData.roomCode;
+            })
+          })
+          setMessages([]);
+          setRoomData();
 
-        props.setMessages([]);
-        setRoomData();
+          backdropContext.turnBackdropOff();
+        }
+        else {
+          snackContext.newSnack(true, "error", res.data.message)
+          backdropContext.turnBackdropOff();
+        }
+      })
+      .catch(err => {
+        console.log(err);
+        snackContext.newSnack(true, "error", "Network Error")
+        backdropContext.turnBackdropOff();
       })
   }
 
   const [members, setMembers] = useState();
   function viewMembersHandler() {
+    backdropContext.turnBackdropOn();
+
     axios
-      .get(`${backendURL}/api/chatRoom/users/room/${roomData.roomCode}`)
+      .post(getUsersInRoomRoute, { roomCode: roomData.roomCode },
+        {
+          headers: { Authorization: `BEARER ${localStorage.getItem('accessToken')}` },
+        })
       .then(res => {
-        setMembers(res.data);
+        if (res.data.success) {
+          setMembers(res.data.data);
+
+          backdropContext.turnBackdropOff();
+        }
+        else {
+          snackContext.newSnack(true, "error", res.data.message)
+          backdropContext.turnBackdropOff();
+        }
       })
       .catch(err => {
         console.log(err);
+        snackContext.newSnack(true, "error", "Network Error")
+        backdropContext.turnBackdropOff();
       })
 
     handleOpen();
@@ -127,6 +171,7 @@ function ChatBox(props) {
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
 
+  // console.log(roomData);
   return (
     <div id='parent-chatbox'>
 
@@ -139,7 +184,8 @@ function ChatBox(props) {
           </div>
         </div>}
 
-        {messages.map((msg, ind) => {
+        {messages && messages.map((msg, ind) => {
+          // console.log(msg.sender.email);
           return (
             <div style={{ display: "flex", textAlign: (userEmail === msg.sender.email) ? "right" : "left", flexDirection: (userEmail === msg.sender.email) ? "row-reverse" : "row" }} key={ind} >
               {userEmail === msg.sender.email ? null : <div className='img-holder'><img alt="avatar" src={msg.sender.avatar} /></div>}

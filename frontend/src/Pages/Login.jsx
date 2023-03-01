@@ -1,70 +1,55 @@
-import React, { useState } from 'react'
-import { Container, Typography, Snackbar, Alert as MuiAlert, LinearProgress } from '@mui/material';
+import React, { useState, useContext } from 'react'
+import { Container, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios';
 
 import ChatImg from '../images/chat_app_img.svg';
 import "../Pages/HomePage.css";
-import { BACKEND_URL } from '../globals';
-
-// For linearProgress
-const Alert = React.forwardRef(function Alert(props, ref) {
-    return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
-});
+import { loginRoute } from '../helpers/routes';
+import SnackContext from '../contexts/SnackContext';
+import BackdropContext from '../contexts/BackdropContext';
 
 const HomePage = () => {
     const navigate = useNavigate();
-
-    // For snacks
-    const [snackOpen, setSnackOpen] = useState(false);
-    const [type, setType] = useState("");
-    const [message, setMessage] = useState("");
-    function snackHandler(t, m) {
-        setType(t);
-        setMessage(m);
-        setSnackOpen(true);
-    }
-    function handleClose(event, reason) {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setSnackOpen(false);
-        setLoading(false);
-    };
-    // Snacks code ends
-
-    const [loading, setLoading] = useState(false);
+    const snackContext = useContext(SnackContext);
+    const backdropContext = useContext(BackdropContext);
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
     function submitHandler(e) {
         e.preventDefault();
-        // console.log(process.env.REACT_APP_BACKEND_URL + "/api/user/auth");
-        setLoading(true);
+        backdropContext.turnBackdropOn();
 
-        // console.log(email, password);
         axios
-            .post(BACKEND_URL + "/api/user/auth", { email, password })
+            .post(loginRoute, { email, password })
             .then(res => {
-                // console.log(res.data.email);
-                snackHandler("success", "Signing you in...");
-                // console.log(res.data);
-                localStorage.setItem("userEmail", res.data.email);
-                setLoading(false);
-                navigate("/chats", { state: { email } });
+                if(res.data.success){
+                    snackContext.newSnack(true, "success", "Successfully logged in.");
+       
+                    localStorage.setItem("accessToken", res.data.accessToken);
+                    localStorage.setItem("userEmail", email);
+    
+                    backdropContext.turnBackdropOff();
+                    navigate("/chats", { state: { email } });
+                }
+                else{
+                    snackContext.newSnack(true, "error", res.data.message);
+                    backdropContext.turnBackdropOff();
+                }
             })
             .catch(err => {
                 console.log(err);
-                snackHandler("error", "Invalid email or password!");
+                backdropContext.turnBackdropOff();
+
+                snackContext.newSnack(true, "error", "Network Error.");
+                // snackHandler("error", "Invalid email or password!");
             })
 
     }
-
+    // console.log(backdropContext.openBackdrop);
     return (
         <div>
-            {loading && <LinearProgress sx={{ position: "fixed", top: 0, right: 0, left: 0 }} />}
-
             <Container maxWidth="xl"
                 sx={{
                     display: "flex",
@@ -88,12 +73,6 @@ const HomePage = () => {
                 </Typography>
 
                 <img alt='chat-img' src={ChatImg}></img>
-
-                <Snackbar open={snackOpen} autoHideDuration={5000} onClose={handleClose}>
-                    <Alert onClose={handleClose} severity={type} sx={{ width: '100%' }}>
-                        {message}
-                    </Alert>
-                </Snackbar>
 
                 <Typography variant='h5'>
                     Login

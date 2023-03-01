@@ -3,23 +3,28 @@ dotenv.config();
 const express = require('express');
 const app = express();
 const bodyParser = require("body-parser");
-const cors = require("cors");
 const path = require("path");
-
-const connect = require('./config/connectToDB');
-const user = require("./routes/user");
-const room = require("./routes/room");
-const message = require("./routes/message");
-
+const cors = require("cors");
 app.use(cors());
+
+const connect = require('./helpers/connectToDB');
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 // app.use(express.json());
 
 connect();
 
+const authUser = require("./routes/authUser")
+app.use("/api/auth", authUser);
+
+const user = require("./routes/user");
 app.use("/api/user", user);
-app.use("/api/chatRoom", room);
+
+const room = require("./routes/room");
+app.use("/api/room", room);
+
+const message = require("./routes/message");
 app.use("/api/message", message);
 
 // app.get("/", (req, res)=>{
@@ -50,6 +55,11 @@ const server = app.listen(PORT, () => {
 
 const io = require('socket.io')(server, {
     pingTimeout: 60000,
+    cors: {
+        origin: process.env.FRONTEND_URL,
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        allowedHeaders: ["Authorization"],
+    }
 });
 
 io.on("connection", socket => {
@@ -72,7 +82,7 @@ io.on("connection", socket => {
     socket.on("newMessage", msg => {
         console.log(msg);
 
-        socket.to(msg.roomId).emit("newMsg", msg);
+        socket.to(msg.roomID).emit("newMsg", msg);
     })
 
     socket.on("disconnect", () => {

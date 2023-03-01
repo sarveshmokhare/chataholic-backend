@@ -1,40 +1,19 @@
-import React, { useState } from 'react'
-import { Container, Typography, Snackbar, Alert as MuiAlert, LinearProgress } from '@mui/material';
+import React, { useState, useContext } from 'react'
+import { Container, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom'
 import axios from "axios";
 import { UploadClient } from '@uploadcare/upload-client'
 
 import ChatImg from '../images/chat_app_img.svg';
 import "../Pages/HomePage.css";
-import { BACKEND_URL } from '../globals';
-
-// For linearProgress
-const Alert = React.forwardRef(function Alert(props, ref) {
-    return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
-});
+import { signupRoute } from '../helpers/routes';
+import SnackContext from '../contexts/SnackContext';
+import BackdropContext from '../contexts/BackdropContext';
 
 const HomePage = () => {
     const navigate = useNavigate();
-
-    // For snacks
-    const [snackOpen, setSnackOpen] = useState(false);
-    const [type, setType] = useState("");
-    const [message, setMessage] = useState("");
-    function snackHandler(t, m) {
-        setType(t);
-        setMessage(m);
-        setSnackOpen(true);
-    }
-    function handleClose(event, reason) {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setSnackOpen(false);
-        setLoading(false);
-    };
-    // Snacks code ends
-
-    const [loading, setLoading] = useState(false);
+    const snackContext = useContext(SnackContext);
+    const backdropContext = useContext(BackdropContext);
 
     const [userData, setUserData] = useState({
         name: "",
@@ -54,16 +33,19 @@ const HomePage = () => {
 
     function imgHandler(e) {
         // console.log(e.target.files[0]);
+        backdropContext.turnBackdropOn();
+        snackContext.newSnack(true, "warning", "Don't close the browser. Image is being uploaded.");
+
         const img = e.target.files[0];
-        console.log(process.env.REACT_APP_CLOUDINARY_CLOUD_NAME);
         console.log(img);
+
         if (img === undefined) {
-            snackHandler("error", "Please upload an image");
+            snackContext.newSnack(true, "error", "Please upload an image.");
+            backdropContext.turnBackdropOff();
             return;
         }
 
         const client = new UploadClient({ publicKey: '26142c26bdf508eb3a05' })
-        setLoading(true);
         client
             .uploadFile(img)
             .then(res => {
@@ -71,51 +53,68 @@ const HomePage = () => {
                 setUserData(prevData => {
                     return ({ ...prevData, avatar: res.cdnUrl })
                 });
-                setLoading(false);
+                snackContext.newSnack(true, "info", "Avatar uploaded successfully.");
+                backdropContext.turnBackdropOff();
             })
             .catch(err => {
                 console.log(err);
-                setLoading(false);
+                snackContext.newSnack(true, "error", "Try again to upload the photo.")
+                backdropContext.turnBackdropOff();
             })
     }
     // console.log(userData);
-    
+
     function submitHandler(e) {
         e.preventDefault();
-        setLoading(true);
-        if(!userData.name || !userData.email || !userData.password || !userData.confirmedPassword){
-            snackHandler("warning", "Please enter all the fields!");
+        backdropContext.turnBackdropOn();
+
+        if (!userData.name || !userData.email || !userData.password || !userData.confirmedPassword) {
+            snackContext.newSnack(true, "warning", "Please enter all the fields!");
+            backdropContext.turnBackdropOff();
             return;
         }
 
-        if(userData.password !== userData.confirmedPassword){
-            snackHandler("warning", "Passwords don't match!");
+        if (userData.password !== userData.confirmedPassword) {
+            snackContext.newSnack(true, "warning", "Passwords don't match!");
+            backdropContext.turnBackdropOff();
             return;
         }
 
-        const formData = new FormData();
-        formData.append("name", userData.name);
-        formData.append("email", userData.email);
-        formData.append("password", userData.password);
-        formData.append("avatar", userData.avatar);
-        console.log(formData);
-        axios.post(BACKEND_URL + "/api/user/add", formData)
+        // const formData = new FormData();
+        // formData.append("name", userData.name);
+        // formData.append("email", userData.email);
+        // formData.append("password", userData.password);
+        // formData.append("avatar", userData.avatar);
+        // console.log(formData);
+        axios.post(signupRoute, {
+            name: userData.name,
+            email: userData.email,
+            password: userData.password,
+            avatar: userData.avatar,
+        })
             .then(res => {
-                console.log(res);
-                snackHandler("success", "Registration successfully!");
-                setLoading(false);
-                navigate("/login");
+                if (res.data.success) {
+                    snackContext.newSnack(true, "success", "Registration successful!")
+
+                    backdropContext.turnBackdropOff();
+                    navigate("/login");
+                }
+                else {
+                    snackContext.newSnack(true, "error", res.data.message);
+                    backdropContext.turnBackdropOff();
+                }
             })
             .catch(err => {
                 console.log(err);
-                snackHandler("error", "An error occured! Please use different credentials or refresh the page and try again.")
+                backdropContext.turnBackdropOff();
+
+                snackContext.newSnack(true, "error", "Network Error.");
+                // snackContext.newSnack(true, "error", "An error occured! Please use different credentials or refresh the page and try again.");
             })
     }
 
     return (
         <div>
-            {loading && <LinearProgress sx={{ position: "fixed", top: 0, right: 0, left: 0 }} />}
-
             <Container maxWidth="xl"
                 sx={{
                     display: "flex",
@@ -124,8 +123,6 @@ const HomePage = () => {
                     color: "white",
                 }}
             >
-
-
                 <Typography
                     variant='h3'
                     sx={{
@@ -140,12 +137,6 @@ const HomePage = () => {
                 </Typography>
 
                 <img alt='chat-img' src={ChatImg}></img>
-
-                <Snackbar open={snackOpen} autoHideDuration={5000} onClose={handleClose}>
-                    <Alert onClose={handleClose} severity={type} sx={{ width: '100%' }}>
-                        {message}
-                    </Alert>
-                </Snackbar>
 
                 <Typography
                     variant='h5'

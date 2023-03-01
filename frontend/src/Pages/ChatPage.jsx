@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom';
-import { LinearProgress } from '@mui/material'
 import axios from 'axios';
 import io from "socket.io-client";
 
@@ -8,23 +7,25 @@ import ChatRooms from '../components/ChatRooms';
 import ChatBox from '../components/ChatBox';
 import Header from '../components/Header';
 import "./ChatPage.css";
-import { BACKEND_URL } from '../globals';
+import { backendUrl, getRoomDataFromIDRoute, getRoomsForAUserRoute, getAllMessagesInARoomRoute } from '../helpers/routes';
+import SnackContext from '../contexts/SnackContext';
+import BackdropContext from '../contexts/BackdropContext';
 
-const backendURL = BACKEND_URL;
-const socket = io(backendURL);;
-
+const socket = io(backendUrl);
 
 function ChatPage() {
     const navigate = useNavigate();
+    const snackContext = useContext(SnackContext);
+    const backdropContext = useContext(BackdropContext);
 
-    const userEmail = localStorage.getItem("userEmail");
-    // console.log(typeof(userEmail));
+    const accessToken = localStorage.getItem("accessToken");
+
     useEffect(() => {
-        if (!userEmail) {
+        if (!accessToken) {
             navigate("/not-logged-in");
         }
-        // console.log("entered useeffect");
-    }, [navigate, userEmail]);
+
+    }, [navigate, accessToken]);
 
     // useEffect(() => {
 
@@ -35,54 +36,90 @@ function ChatPage() {
 
     const [userData, setUserData] = useState();
     const [userID, setUserID] = useState();
+    // console.log(userID);
+    function getUserData(userData){
+        setUserData(userData);
+        setUserID(userData._id)
+    }
+    // console.log(userData);
     useEffect(() => {
-        setLoading(true);
+        // setLoading(true);
+        backdropContext.turnBackdropOn();
+
         axios
-            .get(`${backendURL}/api/user/getUserData/${userEmail}`)
-            .then(result => {
-                // console.log(result);
-                setUserData(result);
-                setUserID(result.data._id);
-                // console.log("userID set!");
-                // console.log(userID);
-
-                return result.data._id;
-            })
-            .then(info => {
-                return axios
-                    .get(`${backendURL}/api/chatRoom/users/${info}`)
-
+            .get(getRoomsForAUserRoute, {
+                headers: { Authorization: `BEARER ${localStorage.getItem('accessToken')}` }
             })
             .then(res => {
                 // console.log(res.data);
-                setRooms(res.data);
-                setLoading(false);
-            })
+                if (res.data.success) {
+                    setRooms(res.data.data);
+                    // setLoading(false);
+                    backdropContext.turnBackdropOff();
+                }
 
+                else {
+                    snackContext.newSnack(true, "error", res.data.message);
+                    backdropContext.turnBackdropOff();
+                }
+            })
+            .catch(err => {
+                console.log(err);
+                snackContext.newSnack(true, "error", "Network Error")
+                backdropContext.turnBackdropOff();
+            })
+        /* eslint-disable */
     }, []);
 
     const [roomMessages, setRoomMessages] = useState([]);
     const [roomID, setRoomID] = useState();
     const [roomData, setRoomData] = useState();
+    // console.log(roomMessages);
     function getClickedRoomID(roomID) {
+        backdropContext.turnBackdropOn();
         // console.log("from chat page", roomID);
+        // console.log(`BEARER ${localStorage.getItem('accessToken')}`);
         setRoomID(roomID);
         axios
-            .get(`${backendURL}/api/message/${roomID}`)
+            .post(getAllMessagesInARoomRoute, { roomID },
+                {
+                    headers: { 'Authorization': `BEARER ${localStorage.getItem('accessToken')}` },
+                })
             .then(res => {
-                setRoomMessages(res.data);
+                // console.log(res.data);
+                if (res.data.success) {
+                    setRoomMessages(res.data.data);
+                }
+                else {
+                    snackContext.newSnack(true, "error", res.data.message)
+                    return backdropContext.turnBackdropOff();
+                }
             })
             .catch(err => {
                 console.log(err);
+                snackContext.newSnack(true, "error", "Network Error.")
+                return backdropContext.turnBackdropOff();
             })
 
         axios
-            .get(`${backendURL}/api/chatRoom/getRoomData/${roomID}`)
-            .then(res=>{
-                setRoomData(res.data);
+            .post(getRoomDataFromIDRoute, { roomID },
+                {
+                    headers: { Authorization: `BEARER ${localStorage.getItem('accessToken')}` }
+                })
+            .then(res => {
+                if (res.data.success) {
+                    setRoomData(res.data.data);
+                    backdropContext.turnBackdropOff();
+                }
+                else {
+                    snackContext.newSnack(true, "error", res.data.message)
+                    backdropContext.turnBackdropOff();
+                }
             })
-            .catch(err =>{
+            .catch(err => {
                 console.log(err);
+                snackContext.newSnack(true, "error", "Network Error.")
+                backdropContext.toggleBackdrop();
             })
     }
     // console.log(roomData);
@@ -93,24 +130,26 @@ function ChatPage() {
             document.querySelector(".chatrooms-box").style.display = "flex";
         }
     }
-    // console.log(window.innerWidth);
-    // console.log(roomMessages);
-    // console.log(clickedRoomID);
-    // console.log(rooms);
-    // console.log(user);
+
     const [roomSelected, setRoomSelected] = useState(false)
-    const [loading, setLoading] = useState(false)
     return (
         <div style={{ width: "100%" }}>
-            {loading && <LinearProgress sx={{ position: "fixed", top: 0, right: 0, left: 0 }} />}
 
-            {userEmail && <Header />}
+            {accessToken ? () => {
+                backdropContext.turnBackdropOn();
+                snackContext.newSnack(true, "error", "Login again.")
+            } : backdropContext.turnBackdropOff()}
+
+            <Header getUserData={getUserData} />
+
             {(window.innerWidth <= 500) ? <button className='backtochat-btn' onClick={getBackBtnHandler} >Chat Rooms</button> : null}
+
             <div
                 className='second-container'
             >
-                {userEmail && <ChatRooms rooms={rooms} clickedRoomID={getClickedRoomID} userData={userData} userID={userID} setRooms={setRooms} socket={socket} roomSelected={roomSelected} setRoomSelected={setRoomSelected} />}
-                {userEmail && <ChatBox roomMessages={roomMessages} roomID={roomID} userData={userData} userID={userID} setMessages={setRoomMessages} socket={socket} roomData={roomData} setRoomData={setRoomData} setRooms={setRooms} rooms={rooms} roomSelected={roomSelected} setRoomSelected={setRoomSelected} />}
+                <ChatRooms rooms={rooms} getClickedRoomID={getClickedRoomID} userData={userData} userID={userID} setRooms={setRooms} socket={socket} roomSelected={roomSelected} setRoomSelected={setRoomSelected} />
+
+                <ChatBox messages={roomMessages} roomID={roomID} userData={userData} userID={userID} setMessages={setRoomMessages} socket={socket} roomData={roomData} setRoomData={setRoomData} setRooms={setRooms} rooms={rooms} roomSelected={roomSelected} setRoomSelected={setRoomSelected} />
             </div>
 
 
