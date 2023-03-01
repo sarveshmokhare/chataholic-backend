@@ -1,4 +1,5 @@
-export const backendUrl = 'http://localhost:8000';
+// export const backendUrl = 'http://localhost:8000';
+export const backendUrl = 'https://chataholic.onrender.com';
 
 export const serverRoute = backendUrl + '/api'
 
